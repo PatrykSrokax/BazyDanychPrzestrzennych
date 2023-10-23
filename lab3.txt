@@ -1,0 +1,106 @@
+1. CREATE DATABASE cw3;
+CREATE EXTENSION postgis;
+-- Nastepnie w cmd
+shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2019_KAR_BUILDINGS.shp" buildings_2019 | psql -p 5432 -h localhost -U postgres -d cw3 
+-- oraz
+shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_BUILDINGS.shp" buildings_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+SELECT *
+FROM buildings_2019 AS b2019
+LEFT JOIN buildings_2018 AS b2018 ON b2018.geom = b2019.geom
+WHERE b2018.gid IS NULL
+
+2. shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_POI_TABLE.shp" kar_poi_table_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_POI_TABLE.shp" kar_poi_table_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+CREATE VIEW changed_buildings AS
+SELECT b2019.*
+FROM buildings_2019 AS b2019
+LEFT JOIN buildings_2018 AS b2018 ON b2018.geom = b2019.geom
+WHERE b2018.gid IS NULL;
+
+SELECT poi_2019.type, COUNT(poi_2019.gid) as liczba
+FROM kar_poi_table_2019 AS poi_2019
+JOIN changed_buildings AS cb ON ST_Intersects(ST_Buffer(cb.geom, 0.005), poi_2019.geom)
+GROUP BY poi_2019.type;
+
+3. shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_STREETS.shp" streets_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_STREETS.shp" streets_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+CREATE TABLE streets_reprojected AS
+SELECT 
+    gid, 
+    link_id, 
+    st_name,
+	ref_in_id,
+	nref_in_id,
+	func_class,
+	speed_cat,
+	fr_speed_l,
+	to_speed_l,
+	dir_travel,
+    ST_Transform(geom, 'EPSG:3068') AS geom
+FROM streets_2019;
+
+4 i 5. CREATE TABLE input_points (
+    gid SERIAL PRIMARY KEY,
+    geom GEOMETRY(Point, 3068)
+);
+
+INSERT INTO input_points (geom)
+VALUES 
+    (ST_SetSRID(ST_MakePoint(8.36093, 49.03174), 3068)),
+    (ST_SetSRID(ST_MakePoint(8.39876, 49.00644), 3068));
+
+SELECT * FROM input_points
+
+6. shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_STREET_NODE.shp" streets_node_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_STREET_NODE.shp" streets_node_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+CREATE TABLE streets_node_2019_reprojected AS
+SELECT
+	gid,
+	node_id,
+	link_id,
+	point_num,
+	z_level,
+	'intersect',
+	lat,
+	lon,
+    ST_Transform(geom, 3068) AS geom
+FROM streets_node_2019;
+
+CREATE VIEW line_points AS
+SELECT st_makeline(geom) AS geom
+FROM input_points;  
+SELECT * FROM line_points;
+
+SELECT DISTINCT node_id
+FROM line_points AS l, streets_node_2019_reprojected AS n
+WHERE st_contains(st_buffer(l.geom, 0.002), n.geom)
+
+7. shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_LAND_USE_A.shp" land_use_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_LAND_USE_A.shp" land_use_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+SELECT
+    sshops.poi_name AS sport_shop_name,
+    parks.name AS park_name
+FROM kar_poi_table_2019 AS sshops
+JOIN land_use_2019 AS parks ON ST_Intersects(sshops.geom, ST_Buffer(parks.geom, 0.003))
+WHERE sshops.type = 'Sporting Goods Store';
+
+8. shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_RAILWAYS.shp" railways_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_RAILWAYS.shp" railways_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+shp2pgsql.exe "C:\AGH\BDP\T2018_KAR_GERMANY\T2018_KAR_WATER_LINES.shp" water_lines_2018 | psql -p 5432 -h localhost -U postgres -d cw3
+shp2pgsql.exe "C:\AGH\BDP\T2019_KAR_GERMANY\T2019_KAR_WATER_LINES.shp" water_lines_2019 | psql -p 5432 -h localhost -U postgres -d cw3
+
+CREATE TABLE T2019_KAR_BRIDGES AS
+SELECT
+    r.gid AS railway_gid,
+    w.gid AS water_line_gid,
+    ST_Intersection(r.geom, w.geom) AS intersection_geom
+FROM
+    railways_2019 AS r,
+    water_lines_2019 AS w
+WHERE
+    ST_Intersects(r.geom, w.geom);
