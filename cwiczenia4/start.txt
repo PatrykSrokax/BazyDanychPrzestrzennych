@@ -1,1 +1,5 @@
-.
+utworzyłem nową bazę danych
+załadowałem shapefile do niej na 2 różne sposoby, CMD oraz BUNDLE3
+poczekałem aż qgis się pobierze
+połączyłem qgis'a z bazą danych
+wykonałem ćwiczenia mi powierzone
