@@ -1,0 +1,33 @@
+1. Pobranie wsl ubuntu przy pomocy komendy wsl --install oraz Ubuntu 22.04
+
+2. Pobranie dockera na wsl:
+sudo apt-get update
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+3. clone git repo git clone https://github.com/kartoza/docker-mapserver
+
+4. cd docker-mapserver
+
+5. docker build -t kartoza/mapserver_kartoza . musialem dodac chmod 777 * oraz byc caly czas pod internetem
+
+6. sudo docker run -d -p 8182:80 --name mapserver2 -v `pwd`/map:/map kartoza/mapserver_kartoza
+
+7. sudo docker exec -it mapserver2 /bin/bash
+
+8. apt-get install wget ca-certificates 
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list'
+zostało dodane w lokalizacji 'C:\Program Files\PostgreSQL\16\data' , linie przy IPv4 local connections
+host    all             all             172.19.208.1/32            trust
+apt-get install postgresql-client
+psql postgresql://postgres:postgres@172.19.208.1/cw6 adres WSL
+psql postgresql://postgres:postgres@10.204.72.195/cw6 adres WIFI
+
+9. apt-get update
+   apt-get install vim
+   
+10. vim /map/dem.map + kod pozyskany z PDF
+
+11. http://localhost:8182/cgi-bin/mapserv?map=/map/dem.map&mode=browse&template=openlayers&layers=all
